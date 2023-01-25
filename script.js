@@ -2,6 +2,9 @@ let balls = [];
 let cubes = [];
 let floor;
 
+const WIDTH = 2420;
+const HEIGHT = 1500;
+
 function setup(){
     new Canvas(2420,1500);
     floor = new Sprite(400,100);
@@ -26,7 +29,18 @@ function setup(){
         ball.addSpeed(Math.random() * 360, Math.random() * 360);
         balls.push(ball);
     }
+}
 
+function countAlive(){
+    let count = 0;
+    const counter = (ball) => {
+        if(0 <= ball.x && ball.x <= WIDTH && 0 <= ball.y && ball.y <= HEIGHT){
+            count ++;
+        }
+    };
+    balls.forEach(counter);
+    cubes.forEach(counter);
+    return count;
 }
 
 function draw(){
@@ -50,8 +64,10 @@ function draw(){
         }
         cube.width = wh;
         cube.height = wh;
+        cubes.push(cube);
     }
     drawSprites();
     textSize(128);
     text("FPS: " + Math.floor(frameRate())  , 100,100);
+    text("Score " + countAlive()  , 100,200);
 }

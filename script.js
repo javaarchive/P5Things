@@ -29,6 +29,8 @@ function setup(){
         ball.addSpeed(Math.random() * 360, Math.random() * 360);
         balls.push(ball);
     }
+
+    frameRate(25);
 }
 
 function countAlive(){

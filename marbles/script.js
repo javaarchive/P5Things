@@ -9,6 +9,9 @@ let balls = [];
 
 const FPS = 60;
 
+let ballDefaultRadius = 10;
+let ballDefaultRadiusAccessor;
+
 let gravityAccessor;
 
 let spawnCount = 1;
@@ -30,6 +33,7 @@ async function setup(){
 
     gravityAccessor = (_ = world.gravity.y) => world.gravity.y = _;
     spawnCountAccessor = (_ = spawnCount) => spawnCount = _;
+    ballDefaultRadiusAccessor = (_ = ballDefaultRadius) => ballDefaultRadius = _;
     
     frameRate(FPS);
 }
@@ -38,9 +42,8 @@ let level = {
     lines: []
 };
 let lineSprites = [];
-
 let placingLine = [];
-
+let trashedLines = [];
 
 function shutdown() {
     ImGui_Impl.Shutdown();
@@ -73,6 +76,38 @@ function gc(){
 let lastFrame = performance.now();
 let framesSinceLastGc = 0;
 
+function createBall(){
+    let ball = new Sprite();
+    ball.radius = ballDefaultRadius;
+    ball.collider = "dynamic";
+
+    balls.push(ball);
+
+    return ball;
+}
+
+function getHoveringBalls(){
+    return balls.filter(ball => dist(mouse.x, mouse.y, ball.x, ball.y) <= ball.radius);
+}
+
+function undo(){
+    if(level.lines.length == 0) return;
+    trashedLines.push(level.lines.pop());
+    lineSprites.pop().remove();
+}
+
+function redo(){
+    if(trashedLines.length > 0){
+        let line = trashedLines.pop();
+        let lineSprite = new Sprite(line);
+        lineSprite.collider = "static";
+        lineSprite.color = "white";
+        level.lines.push(line);
+        lineSprites.push();
+    }
+    
+}
+
 function draw(){
     if(!setupDone) return;
     const frameDelta = performance.now() - lastFrame;
@@ -97,28 +132,26 @@ function draw(){
     ImGui.Begin("Debugging");
     if(ImGui.Button("Spawn Ball")){
         for(let i = 0; i < spawnCount; i++){
-            let ball = new Sprite();
-            ball.radius = 10;
-            ball.collider = "dynamic";
+           
+            let ball = createBall();
 
             ball.x = random(0,WIDTH);
             ball.y = random(0,HEIGHT);
-
-            balls.push(ball);
         }
     }
     if(ImGui.Button("Remove unneeded balls")){
         gc();
     }
 
-    if(kb.pressing("shift")){
+    if(kb.pressing("shift") && !kb.pressing("control") && !kb.pressing("z")){
         ImGui.Text("Placing line with " + placingLine.length + " points!");
         if(mouse.pressing()){
-            if(placingLine.length > 2){
-                let lastIndex = placementLine.length - 1;
+            if(placingLine.length > 3){
+                let lastIndex = placingLine.length - 1;
                 let lastPoint = placingLine[lastIndex];
-                let deltaX = Math.abs(mouse.x - lastPoint.x);
-                let deltaY = Math.abs(mouse.y - lastPoint.y);
+                let deltaX = Math.abs(mouse.x - lastPoint[0]);
+                let deltaY = Math.abs(mouse.y - lastPoint[1]);
+                // console.log(deltaX, deltaY);
                 if((deltaX + deltaY) > 5){
                     placingLine.push([mouse.x,mouse.y]);
                 }
@@ -127,17 +160,56 @@ function draw(){
             }
         }
         if(mouse.released()){
-            if(placingLine.length > 2){
+            if(placingLine.length > 6){ // 4 points result in square smh
                 level.lines.push(placingLine);
                 let lineSprite = new Sprite(placingLine);
                 lineSprite.collider = "static";
                 lineSprite.color = "white";
                 lineSprites.push(lineSprite);
-                console.log("Placed line sprite");
+                console.log("Placed line sprite",placingLine);
+                placingLine = [];
+            }else{
+                ImGui.Text("Cancelled line place due to not enough points");
                 placingLine = [];
             }
         }
+    }else{
+        const bulkDropActive = (keyboard.pressing("control") && mouse.pressing() && !kb.pressing("z") && !kb.pressing("shift"));
+        if(mouse.presses() || (bulkDropActive)){
+            let hoveringOverBalls = getHoveringBalls()
+            if(hoveringOverBalls.length > 0 && !bulkDropActive){
+                
+            }else{
+                let ball = createBall();
+                ball.x = mouse.x;
+                ball.y = mouse.y;
+            }
+        }else if(!bulkDropActive && mouse.pressing()){
+            let hoveringOverBalls = getHoveringBalls();
+            if(kb.pressing("alt")){
+                hoveringOverBalls.forEach(ball => {
+                    ball.moveTowards(mouse,0.999)
+                });
+            }else{
+                hoveringOverBalls.forEach(ball => {
+                    ball.moveTo(mouse)
+                });
+            }
+            
+            // end mouse controls
+        }else if(kb.pressing("control")){
+            ImGui.Text("Trashed lines: " + trashedLines.length);
+            if(kb.pressed("z")){
+               if(level.lines.length > 0){
+                    undo();
+                }
+            }
+        }
     }
+
+    if(ImGui.Button("Undo")) undo();
+    ImGui.SameLine();
+    if(ImGui.Button("Redo")) redo();
 
     if(ImGui.Button("Kaboom")){
         balls.forEach((ball) => {
@@ -157,6 +229,7 @@ function draw(){
 
     ImGui.InputInt("Gravity", gravityAccessor);
     ImGui.InputInt("Spawn Quantity", spawnCountAccessor);
+    ImGui.InputInt("Ball Size (radius) ", ballDefaultRadiusAccessor);
     ImGui.Text("Ball Count: " + balls.length);
     ImGui.Text("Frames since last GC:" + framesSinceLastGc);
     ImGui.End();

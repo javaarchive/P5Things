@@ -6,6 +6,7 @@ let canvas;
 let setupDone = false;
 
 let balls = [];
+let turnables = [];
 
 const FPS = 60;
 
@@ -22,7 +23,8 @@ let IO = null;
 const TOOLS = {
     SPAWNER: 1,
     LINE: 2,
-    SELECT: 3
+    SELECT: 3,
+    TURNABLE_SPAWNER: 4
 }
 
 let currentTool = TOOLS.SPAWNER;
@@ -56,7 +58,8 @@ async function setup(){
 }
 
 let level = {
-    lines: []
+    lines: [],
+    turnables: []
 };
 let lineSprites = [];
 let placingLine = [];
@@ -129,7 +132,36 @@ function redo(){
         level.lines.push(line);
         lineSprites.push();
     }
+}
+
+// TODO: func to build sprite from serialized version
+
+function syncRotations(){
+    turnables.forEach((sprite) => {
+        sprite.rotation = 0;
+    });
+}
+
+function createTurnable(x = mouse.x, y = mouse.y, width = 80, height = 32, speed = 4){
+    let turnableSprite = new Sprite(x,y);
+    turnableSprite.width = width;
+    turnableSprite.height = height;
+    let turnable = {
+        x,y,width,height,speed
+    };
+
+    // allows sprite to autorotate but not fall due to gravity
+    turnableSprite.collider = "kinematic";
     
+    turnableSprite.rotationSpeed = speed;
+
+    turnables.push(turnableSprite);
+    level.turnables.push(turnable);
+
+
+    syncRotations();
+
+    return [turnableSprite, turnable];
 }
 
 function draw(){
@@ -178,6 +210,7 @@ function draw(){
     ImGui.RadioButton("Spawn Balls",currentToolAccessor,TOOLS.SPAWNER);
     ImGui.RadioButton("Line",currentToolAccessor,TOOLS.LINE);
     ImGui.RadioButton("Select",currentToolAccessor,TOOLS.SELECT);
+    ImGui.RadioButton("Spawn Turnables",currentToolAccessor,TOOLS.TURNABLE_SPAWNER);
 
     if(currentTool == TOOLS.LINE){
         if(kb.pressing("shift") || kb.released("shift")){
@@ -282,11 +315,18 @@ function draw(){
     // The wants capture mouse tells us if the mouse is hovering above a gui window
     // In that case we do not trigger the tool
     if(currentTool == TOOLS.SPAWNER && !IO.WantCaptureMouse){
-        const bulkDropActive = (keyboard.pressing("control") && mouse.pressing() && !kb.pressing("z") && !kb.pressing("shift"));
+        const bulkDropActive = keyboard.pressing("control") && mouse.pressing();
         if(mouse.presses() || (bulkDropActive)){
             let ball = createBall();
             ball.x = mouse.x;
             ball.y = mouse.y;
+        }
+        
+    }
+
+    if(currentTool == TOOLS.TURNABLE_SPAWNER && !IO.WantCaptureMouse){
+        if(mouse.presses()){
+            let turnable = createTurnable(mouse.x, mouse.y);
         }
         
     }

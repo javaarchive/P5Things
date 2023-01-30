@@ -134,7 +134,7 @@ function redo(){
 
 function draw(){
     if(!setupDone) return;
-    const frameDelta = performance.now() - lastFrame;
+    const frameDelta = deltaTime; performance.now() - lastFrame;
     lastFrame = performance.now();
 
     background("#2c2f33");
@@ -180,7 +180,7 @@ function draw(){
     ImGui.RadioButton("Select",currentToolAccessor,TOOLS.SELECT);
 
     if(currentTool == TOOLS.LINE){
-        if(kb.pressing("shift")){
+        if(kb.pressing("shift") || kb.released("shift")){
         ImGui.Text("Placing line with " + placingLine.length + " points!");
             if(mouse.pressing() && !IO.WantCaptureMouse){
                 if(placingLine.length > 3){
@@ -189,14 +189,14 @@ function draw(){
                     let deltaX = Math.abs(mouse.x - lastPoint[0]);
                     let deltaY = Math.abs(mouse.y - lastPoint[1]);
                     // console.log(deltaX, deltaY);
-                    if((deltaX + deltaY) > 5){
+                    if((deltaX + deltaY) > 10){
                         placingLine.push([mouse.x,mouse.y]);
                     }
                 }else{
                     placingLine.push([mouse.x,mouse.y]);
                 }
             }
-            if(mouse.released()){
+            if(mouse.released() || keyboard.released("shift")){
                 if(placingLine.length > 6){ // 4 points result in square smh
                     level.lines.push(placingLine);
                     let lineSprite = new Sprite(placingLine);

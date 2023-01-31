@@ -19,10 +19,15 @@ let spawnCountAccessor;
 
 let IO = null;
 
+let turningSpeed = 0.1;
+let turningSpeedAccessor =  (_ = turningSpeed) => turningSpeed = _;
+
 const TOOLS = {
     SPAWNER: 1,
     LINE: 2,
-    SELECT: 3
+    SELECT: 3,
+    SELECT_MULTIPLE: 4,
+    TURNABLE_SPAWNER: 5
 }
 
 let currentTool = TOOLS.SPAWNER;
@@ -56,11 +61,14 @@ async function setup(){
 }
 
 let level = {
-    lines: []
+    lines: [],
+    turnables: []
 };
 let lineSprites = [];
 let placingLine = [];
 let trashedLines = [];
+
+let turnableSprites = [];
 
 function shutdown() {
     ImGui_Impl.Shutdown();
@@ -178,6 +186,8 @@ function draw(){
     ImGui.RadioButton("Spawn Balls",currentToolAccessor,TOOLS.SPAWNER);
     ImGui.RadioButton("Line",currentToolAccessor,TOOLS.LINE);
     ImGui.RadioButton("Select",currentToolAccessor,TOOLS.SELECT);
+    ImGui.RadioButton("Select Multiple",currentToolAccessor,TOOLS.SELECT_MULTIPLE);
+    ImGui.RadioButton("Spawn Turnables",currentToolAccessor,TOOLS.TURNABLE_SPAWNER);
 
     if(currentTool == TOOLS.LINE){
         if(kb.pressing("shift")){
@@ -233,7 +243,24 @@ function draw(){
                 undo();
             }
         }
+    }else if(currentTool == TOOLS.TURNABLE_SPAWNER && !IO.WantCaptureMouse){
+        if(mouse.pressed()){
+            let turnable = {
+                x: mouse.x,
+                y: mouse.y
+            }
+            let turnableSprite = new Sprite(turnable.x, turnable.y);
+            turnableSprite.collider = "static";
+            turnableSprite.rotation = 45;
+            turnableSprite.width = 64;
+            turnableSprite.height = 36;
+            turnableSprites.push(turnableSprite);
+        }
     }
+
+    turnableSprites.forEach((sprite) => {
+        sprite.rotation = (sprite.rotation + frameDelta * turningSpeed) % 360;
+    });
 
     if(ImGui.Button("Undo")) undo();
     ImGui.SameLine();
@@ -261,6 +288,10 @@ function draw(){
     if(ImGui.TreeNode("Physics")){
         ImGui.InputInt("Gravity", gravityAccessor);
         ImGui.InputInt("Spawn Quantity", spawnCountAccessor);
+        ImGui.InputDouble("Turning Speed", turningSpeedAccessor, 0.01,0.1);
+        if(ImGui.Button("Sync Rotations of Turnables")){
+            turnableSprites.forEach((sprite) => sprite.rotation = 0);
+        }
         ImGui.TreePop();
     }
     if(ImGui.TreeNode("Random/Misc")){
@@ -291,4 +322,8 @@ function draw(){
         
     }
     
+}
+
+async function copyLevel(){
+    await navigator.clipboard.writeText(JSON.stringify(level));
 }

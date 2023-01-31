@@ -229,7 +229,7 @@ function loadJson(newLevel){
         let turnableSprite = deserializeTurnable(turnable);
         turnables.push(turnableSprite);
     })
-    if(newLevel.extra){
+    if(newLevel.extras){
         level.extras = newLevel.extras;
     }else{
         level.extras = {};
@@ -247,18 +247,19 @@ function draw(){
     stroke("black");
     fill("white");
     text("FPS: " + Math.floor(frameRate()), 50, 50);
-    if(framesSinceLastGc > FPS * 10){ // 10 seconds
+    if(framesSinceLastGc > FPS * 1){ // 1 second
         gc();
     }else{
         framesSinceLastGc ++;
     }
     if(level.extras.autospawn){
         framesSinceLastAutoSpawn ++;
-        if(framesSinceLastAutoSpawn > FPS * 2){
+        if(framesSinceLastAutoSpawn > FPS * (level.extras.autospawn.interval || 1)){
             // Every 2 seconds we may spawn a ball if the level asks
             let ball = createBall();
             ball.x = level.extras.autospawn.x;
             ball.y = level.extras.autospawn.y;
+            framesSinceLastAutoSpawn = 0;
         }
     }
     drawSprites();
@@ -350,6 +351,12 @@ function draw(){
         }
         ImGui.InputInt("Default Turnable Width", defaultTurnableWidthAccessor);
         ImGui.InputInt("Default Turnable Height", defaultTurnableHeightAccessor);
+    }else if(currentTool == TOOLS.SELECT){
+        balls.forEach((ball) => {
+            if(ball.mouse.pressing()){
+                ball.moveTowards(mouse.x, mouse.y, 0.999);
+            }
+        });
     }
 
     if(ImGui.Button("Undo")) undo();
@@ -385,6 +392,8 @@ function draw(){
         ImGui.InputInt("Offset Y", offsetYAccessor);
         ImGui.TreePop();
     }
+
+
     if(ImGui.TreeNode("Level Data")){
         if(ImGui.Button("Save to Clipboard")){
             navigator.clipboard.writeText(JSON.stringify(level));
@@ -404,7 +413,8 @@ function draw(){
     }
     ImGui.InputInt("Ball Size (radius) ", ballDefaultRadiusAccessor);
     ImGui.Text("Ball Count: " + balls.length);
-    ImGui.Text("Frames since last GC:" + framesSinceLastGc);
+    ImGui.Text("Frames since last GC:" + framesSinceLastGc + " as: " + framesSinceLastAutoSpawn);
+    ImGui.Text("x: " + mouse.x + " " + mouse.y + " mouse ");
     ImGui.End();
     ImGui.EndFrame();
     ImGui.Render();

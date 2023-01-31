@@ -30,6 +30,15 @@ const TOOLS = {
 let currentTool = TOOLS.SPAWNER;
 let currentToolAccessor = (_ = currentTool) => currentTool = _;
 
+let rotationSpeed = 3;
+let rotationSpeedAccessor = (_ = rotationSpeed) => rotationSpeed = _;
+
+let defaultTurnableWidth = 80;
+let defaultTurnableHeight = 16;
+
+let defaultTurnableWidthAccessor = (_ = defaultTurnableWidth) => defaultTurnableWidth = _;
+let defaultTurnableHeightAccessor = (_ = defaultTurnableHeight) => defaultTurnableHeight = _;
+
 let offsetXAccessor, offsetYAccessor;
 
 async function setup(){
@@ -55,15 +64,22 @@ async function setup(){
     ballDefaultRadiusAccessor = (_ = ballDefaultRadius) => ballDefaultRadius = _;
     
     frameRate(FPS);
+
+    let usp = new URLSearchParams(location.search);
+    if(usp.get("default_level")){
+        loadJson(JSON.parse(document.getElementById("level-json").textContent));
+    }
 }
 
 let level = {
     lines: [],
-    turnables: []
+    turnables: [],
+    extras: {}
 };
 let lineSprites = [];
 let placingLine = [];
 let trashedLines = [];
+let trashedTurnables = [];
 
 function shutdown() {
     ImGui_Impl.Shutdown();
@@ -102,6 +118,7 @@ function nukeAll(){
 
 let lastFrame = performance.now();
 let framesSinceLastGc = 0;
+let framesSinceLastAutoSpawn = 0;
 
 function createBall(){
     let ball = new Sprite();
@@ -118,20 +135,35 @@ function getHoveringBalls(){
 }
 
 function undo(){
-    if(level.lines.length == 0) return;
-    trashedLines.push(level.lines.pop());
-    lineSprites.pop().remove();
+    if(currentTool == TOOLS.LINE){
+        if(level.lines.length == 0) return;
+        trashedLines.push(level.lines.pop());
+        lineSprites.pop().remove();
+    }else if(currentTool == TOOLS.TURNABLE_SPAWNER){
+        if(level.turnables.length == 0) return;
+        trashedTurnables.push(level.turnables.pop());
+        turnables.pop().remove();
+    }
 }
 
 function redo(){
-    if(trashedLines.length > 0){
+    if(currentTool == TOOLS.LINE){
+        if(trashedLines.length == 0) return
         let line = trashedLines.pop();
         let lineSprite = new Sprite(line);
         lineSprite.collider = "static";
         lineSprite.color = "white";
         level.lines.push(line);
         lineSprites.push();
+    }else if(currentTool == TOOLS.TURNABLE_SPAWNER){
+        if(trashedTurnables.length == 0) return;
+        let turnable = trashedTurnables.pop();
+        let turnableSprite = deserializeTurnable(turnable);
+        level.turnables.push(turnable);
+        turnables.push(turnableSprite); 
+        syncRotations();
     }
+        
 }
 
 // TODO: func to build sprite from serialized version
@@ -139,29 +171,69 @@ function redo(){
 function syncRotations(){
     turnables.forEach((sprite) => {
         sprite.rotation = 0;
+        sprite.rotationSpeed = rotationSpeed;
     });
 }
 
-function createTurnable(x = mouse.x, y = mouse.y, width = 80, height = 32, speed = 4){
-    let turnableSprite = new Sprite(x,y);
-    turnableSprite.width = width;
-    turnableSprite.height = height;
+function deserializeTurnable(obj){
+    let turnableSprite = new Sprite(obj.x,obj.y);
+    turnableSprite.width = obj.width;
+    turnableSprite.height = obj.height;
+    // allows sprite to autorotate but not fall due to gravity
+    turnableSprite.collider = "kinematic";
+    turnableSprite.rotationSpeed = obj.speed;
+
+    return turnableSprite;
+}
+
+function createTurnable(x = mouse.x, y = mouse.y, width = defaultTurnableWidth, height = defaultTurnableHeight, speed = 4){
     let turnable = {
         x,y,width,height,speed
     };
 
-    // allows sprite to autorotate but not fall due to gravity
-    turnableSprite.collider = "kinematic";
+    let turnableSprite = deserializeTurnable(turnable);
     
-    turnableSprite.rotationSpeed = speed;
-
     turnables.push(turnableSprite);
     level.turnables.push(turnable);
-
 
     syncRotations();
 
     return [turnableSprite, turnable];
+}
+
+function deserializeLine(points){
+    let lineSprite = new Sprite(points);
+    lineSprite.collider = "static";
+    lineSprite.color = "white";
+    return lineSprite;
+}
+
+function createLine(line){
+    let lineSprite = deserializeLine(line);
+    level.lines.push(line);
+    lineSprites.push(lineSprite);
+    return lineSprite;
+}
+
+function loadJson(newLevel){
+    balls.forEach((ball) => ball.remove());
+    balls = [];
+    turnables = [];
+    lineSprites = [];
+    level.lines = newLevel.lines;
+    level.turnables = newLevel.turnables;
+    level.lines.forEach((line) => {
+        createLine(line);
+    });
+    level.turnables.forEach((turnable) => {
+        let turnableSprite = deserializeTurnable(turnable);
+        turnables.push(turnableSprite);
+    })
+    if(newLevel.extra){
+        level.extras = newLevel.extras;
+    }else{
+        level.extras = {};
+    }
 }
 
 function draw(){
@@ -179,6 +251,15 @@ function draw(){
         gc();
     }else{
         framesSinceLastGc ++;
+    }
+    if(level.extras.autospawn){
+        framesSinceLastAutoSpawn ++;
+        if(framesSinceLastAutoSpawn > FPS * 2){
+            // Every 2 seconds we may spawn a ball if the level asks
+            let ball = createBall();
+            ball.x = level.extras.autospawn.x;
+            ball.y = level.extras.autospawn.y;
+        }
     }
     drawSprites();
 
@@ -231,11 +312,7 @@ function draw(){
             }
             if(mouse.released() || keyboard.released("shift")){
                 if(placingLine.length > 6){ // 4 points result in square smh
-                    level.lines.push(placingLine);
-                    let lineSprite = new Sprite(placingLine);
-                    lineSprite.collider = "static";
-                    lineSprite.color = "white";
-                    lineSprites.push(lineSprite);
+                    createLine(placingLine);
                     console.log("Placed line sprite",placingLine);
                     placingLine = [];
                 }else{
@@ -266,6 +343,13 @@ function draw(){
                 undo();
             }
         }
+    }else if(currentTool == TOOLS.TURNABLE_SPAWNER){
+        ImGui.InputDouble("Rotation Speed (requires sync)",rotationSpeedAccessor,0.1,0.01   );
+        if(ImGui.Button("Sync Turnables")){
+            syncRotations();
+        }
+        ImGui.InputInt("Default Turnable Width", defaultTurnableWidthAccessor);
+        ImGui.InputInt("Default Turnable Height", defaultTurnableHeightAccessor);
     }
 
     if(ImGui.Button("Undo")) undo();
@@ -301,6 +385,23 @@ function draw(){
         ImGui.InputInt("Offset Y", offsetYAccessor);
         ImGui.TreePop();
     }
+    if(ImGui.TreeNode("Level Data")){
+        if(ImGui.Button("Save to Clipboard")){
+            navigator.clipboard.writeText(JSON.stringify(level));
+        }
+        if(ImGui.Button("Load from Clipboard")){
+            navigator.clipboard.readText().then((text) => {
+                try{
+                    let level = JSON.parse(text);
+                    loadJson(level);
+                }catch(ex){
+                    alert("Error loading level " + ex);
+                }
+            })
+            
+        }
+        ImGui.TreePop();
+    }
     ImGui.InputInt("Ball Size (radius) ", ballDefaultRadiusAccessor);
     ImGui.Text("Ball Count: " + balls.length);
     ImGui.Text("Frames since last GC:" + framesSinceLastGc);
@@ -328,7 +429,6 @@ function draw(){
         if(mouse.presses()){
             let turnable = createTurnable(mouse.x, mouse.y);
         }
-        
     }
     
 }

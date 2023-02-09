@@ -19,7 +19,7 @@ function preload(){
 function setup(){
     new Canvas(WIDTH,HEIGHT);
     engine.createSimplePlayer(characterImg);
-    testTile = tileset1.makeTileSprite(10,9,200,200);
+    testTile = tileset1.makeTileSprite(10,9,0,200, 5);
 
     window.tileset1 = tileset1;
     window.testTile = testTile;
@@ -36,6 +36,11 @@ function draw(){
 
     if(kb.pressing("t")){
         if(tileset1) tileset1.debugTilemap();
+    }
+
+    if(engine.offset.y >= 1000){
+        engine.offset.x = 0;
+        engine.offset.y = 0;
     }
 }
 

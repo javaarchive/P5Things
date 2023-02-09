@@ -8,6 +8,10 @@ function rectangleIntersects(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2){
 // Sprite but minimal for tiles. 
 // Supports only rectangle bounding box. 
 
+const VELOCITY_SMOOTHING = 0.2;
+const GRAVITY_MULTIPLIER = 0.2;
+const JUMP_MULTIPLIER = 5;
+
 class Tileset {
     constructor(image, tileWidth, tileHeight){
         this.image = image;
@@ -20,14 +24,15 @@ class Tileset {
         text("X: " + (mouseX - 100) + " Y: " + (mouseY - 100), 100, 100);
     }
 
-    makeTileSprite(tilex, tiley, offsetX, offsetY){
+    makeTileSprite(tilex, tiley, offsetX, offsetY, scale = 1){
         let ps = new PsuedoSprite(offsetX, offsetY);
         ps.image = this.image;
         ps.tileset = this;
-        ps.width = this.tileWidth;
-        ps.height = this.tileHeight;
+        ps.width = this.tileWidth * scale;
+        ps.height = this.tileHeight * scale;
         ps.tx = tilex;
         ps.ty = tiley;
+        ps.tileUpscale = scale;
         return ps;
     }
 
@@ -49,6 +54,7 @@ class PsuedoSprite {
      * @memberof PsuedoSprite
      */
     tileset = null;
+    tileUpscale = 1;
     // Selected tile x,y
     tx = 0;
     ty = 0;
@@ -70,7 +76,7 @@ class PsuedoSprite {
         if(this.image){
             if(this.tileset){
                 // Delegate to tileset draw function. 
-                this.tileset.drawTile(this.x,this.y,this.tx,this.ty, 1);
+                this.tileset.drawTile(this.x,this.y,this.tx,this.ty, this.tileUpscale);
             }else{
                 image(this.image, this.x, this.y, this.width, this.height);
             }
@@ -87,7 +93,7 @@ class PsuedoSprite {
 
 class Engine {
 
-    movementPerMs = 0.5;
+    movementPerMs = 2;
 
     width = 640;
     height = 480;
@@ -137,9 +143,16 @@ class Engine {
      */
     psuedoSprites = [];
     debug = {};
+    velocity = {
+        x: 0,
+        y: 0
+    }
 
     player = null;
     ghostPlayer = null; 
+
+    horziontalMovementMult = 0.3;
+    verticalMovementMult = 1;
 
     loadAssetImage(src, id = null){
         // Load assets
@@ -348,17 +361,28 @@ class Engine {
     runKeyboardControls(){
         let movementAmount = this.movementPerMs * deltaTime;
         let movementVector = [0,0];
+        // If you can't move downwards then you are on the ground
+        const onGround = !this.checkCanMoveInVector([0, this.player.height/10]);
         if(kb.pressing("left")){
-            movementVector[0] -= movementAmount;
+            movementVector[0] -= movementAmount * this.horziontalMovementMult;
         }
         if(kb.pressing("right")){
-            movementVector[0] += movementAmount;
+            movementVector[0] += movementAmount * this.horziontalMovementMult;
         }
-        if(kb.pressing("up")){
-            movementVector[1] -= movementAmount;
+        this.debug["onGround"] = onGround;
+        if(kb.pressing("up") || kb.pressing("space") || mouse.pressing()){
+            // This does the jump logic
+            
+            // Require the player to be on the ground, so we check collision going bottomn
+            if(onGround){
+                this.velocity.y -= movementAmount * this.verticalMovementMult * JUMP_MULTIPLIER;
+            }
+        }
+        if(!onGround){
+            this.velocity.y += deltaTime * GRAVITY_MULTIPLIER;
         }
         if(kb.pressing("down")){
-            movementVector[1] += movementAmount;
+            movementVector[1] += movementAmount * this.verticalMovementMult;
         }
         if(movementVector[0] == movementVector[1] && movementVector[1] == 0) return;
         // wall check code, multiply vec by a scalar to check in advance
@@ -380,12 +404,21 @@ class Engine {
         background("gray");
     }
 
+    update(){
+        // Apply velocity
+        this.offset.x += this.velocity.x * VELOCITY_SMOOTHING;
+        this.offset.y += this.velocity.y * VELOCITY_SMOOTHING;
+        this.velocity.x *= (1 - VELOCITY_SMOOTHING);
+        this.velocity.y *= (1 - VELOCITY_SMOOTHING);
+    }
+
     loop(deltaTime_ms){
         this.delta = deltaTime_ms;
         this.clear();
         this.drawBackground();
         this.sync();
         this.runControls();
+        this.update();
         // Draw the psuedo sprites
         translate(this.width/2,this.height/2);
         translate(-this.offset.x, -this.offset.y);

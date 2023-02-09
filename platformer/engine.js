@@ -70,7 +70,7 @@ class PsuedoSprite {
         if(this.image){
             if(this.tileset){
                 // Delegate to tileset draw function. 
-                this.tileset.drawTile(this.x,this.y,this.tx,this.ty, 4);
+                this.tileset.drawTile(this.x,this.y,this.tx,this.ty, 1);
             }else{
                 image(this.image, this.x, this.y, this.width, this.height);
             }
@@ -157,6 +157,13 @@ class Engine {
         engine_data[loadJSON(src)];
     }
 
+    applyOffsetToBB(bb){
+        return [
+            [bb[0][0] + this.offset.x, bb[0][1] + this.offset.y],
+            [bb[1][0] + this.offset.x, bb[1][1] + this.offset.y]
+        ]
+    }
+
     /**
      * Add a psuedo sprite to the engine.
      *
@@ -207,12 +214,12 @@ class Engine {
         // TODO: account for sprite.scale if needed
         return [
             [
-                this.player.x - this.player.width/2,
-                this.player.y - this.player.height/2
+                this.offset.x - this.player.width/2,
+                this.offset.y - this.player.height/2
             ],
             [
-                this.player.x + this.player.width/2,
-                this.player.y + this.player.height/2
+                this.offset.x + this.player.width/2,
+                this.offset.y + this.player.height/2
             ]
         ];
     }
@@ -261,7 +268,11 @@ class Engine {
         if(!this.ghostPlayer) return true;
         this.ghostPlayer.x = this.player.x + vec[0];
         this.ghostPlayer.y = this.player.y + vec[1];
-        let bb = this.getPlayerBoundingBox;
+        let bb = this.getPlayerBoundingBox();
+        bb[0][0] += vec[0];
+        bb[0][1] += vec[1];
+        bb[1][0] += vec[0];
+        bb[1][1] += vec[1];
         let point1 = bb[0];
         let point2 = bb[1];
         this.debug["intersectsPS"] = false;
@@ -287,14 +298,17 @@ class Engine {
     }
 
     generateDebug(){
-        this.debug["psCount"] = this.psuedoSprites.length
+        this.debug["psCount"] = this.psuedoSprites.length;
+        this.debug["player_bb"] = this.getPlayerBoundingBox();
+        this.debug["ps_bb"] = this.psuedoSprites[0].getBoundingBox();
     }
 
     runDebugControls(){
         this.generateDebug();
         if(kb.pressing("q")){
+            fill("red");
             text("FPS: " + Math.round(frameRate()), 10,10);
-            text("Offset: " + this.offset.x + ", " + this.offset.y, 10, 30);
+            text("Offset: " + Math.floor(this.offset.x) + ", " + Math.floor(this.offset.y), 10, 30);
             this.ghostPlayer.visible = true;
             this.ghostPlayer.debug = true;
             let curDebugY = 50;
@@ -303,6 +317,25 @@ class Engine {
                 text(key + ": " + this.debug[key], 10, curDebugY);
                 curDebugY += 20;
             }
+            // Draw bounding boxes
+            let bb = this.getPlayerBoundingBox();
+
+            rectMode(CORNERS);
+            fill("red");
+            console.log(...bb[0], ...bb[1]);
+            /*let dbg = document.getElementById("debug-rect");
+            dbg.style.backgroundColor = "cyan";
+            dbg.style.left = bb[0][0] + "px";
+            dbg.style.top = bb[0][1] + "px";
+            dbg.style.minWidth = (bb[1][0] - bb[1][0]) + "px";
+            dbg.style.width = (bb[1][0] - bb[0][0]) + "px";
+            dbg.style.minHeight = (bb[1][1] - bb[0][1]) + "px";
+            dbg.style.height = (bb[1][1] - bb[0][1]) + "px";*/
+            if(kb.pressing("r")) rect(...bb[0], ...bb[1]);
+
+            bb = this.psuedoSprites[0].getBoundingBox();
+            fill("pink");
+            rect(...bb[0], ...bb[1]);
         }else {
             this.ghostPlayer.visible = false;
             this.ghostPlayer.debug = false;
@@ -327,9 +360,14 @@ class Engine {
         if(kb.pressing("down")){
             movementVector[1] += movementAmount;
         }
-        if(this.checkCanMoveInVector(movementVector)){
+        if(movementVector[0] == movementVector[1] && movementVector[1] == 0) return;
+        // wall check code, multiply vec by a scalar to check in advance
+        if(this.checkCanMoveInVector(movementVector.map(v => v*1.2))){
             this.offset.x += movementVector[0];
             this.offset.y += movementVector[1];
+        }else{
+            // this.offset.x -= movementVector[0];
+            // this.offset.y -= movementVector[1];
         }
     }
 
@@ -349,11 +387,13 @@ class Engine {
         this.sync();
         this.runControls();
         // Draw the psuedo sprites
-        translate(this.offset.x, this.offset.y);
+        translate(this.width/2,this.height/2);
+        translate(-this.offset.x, -this.offset.y);
         for(let ps of this.psuedoSprites){
             ps.draw();
         }
-        translate(-this.offset.x, -this.offset.y);
+        translate(this.offset.x, this.offset.y);
+        translate(-this.width/2,-this.height/2);
         // Draw the real sprites
         for(let sprite of this.sprites){
             sprite.draw();
@@ -364,6 +404,9 @@ class Engine {
         }
     }
 
+    init(){
+        rectMode(CORNERS);
+    }
 
 }
 

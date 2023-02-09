@@ -25,6 +25,8 @@ function setup(){
     window.testTile = testTile;
 
     engine.addPsuedoSprite(testTile);
+
+    engine.init();
 }
 
 

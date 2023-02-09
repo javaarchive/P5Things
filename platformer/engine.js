@@ -24,10 +24,14 @@ class Tileset {
         text("X: " + (mouseX - 100) + " Y: " + (mouseY - 100), 100, 100);
     }
 
-    makeTileSprite(tilex, tiley, offsetX, offsetY, scale = 1){
+    makeTileSprite(tilex, tiley, offsetX, offsetY, scale = 1, targetSize = null){
         let ps = new PsuedoSprite(offsetX, offsetY);
         ps.image = this.image;
         ps.tileset = this;
+        if(targetSize){
+            // TODO: non-square tile support when?
+            scale = targetSize / this.image.width;
+        }
         ps.width = this.tileWidth * scale;
         ps.height = this.tileHeight * scale;
         ps.tx = tilex;

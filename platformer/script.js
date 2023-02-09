@@ -10,6 +10,8 @@ let characterImg;
 let tileset1;
 let testTile;
 
+const TILE_MULTIPLIER = 2;
+
 function preload(){
     characterImg = engine.loadAssetImage("platformer/assets/default.png");
     engine.bg = engine.loadAssetImage("platformer/assets/cloudmap_bg.png");
@@ -19,7 +21,7 @@ function preload(){
 function setup(){
     new Canvas(WIDTH,HEIGHT);
     engine.createSimplePlayer(characterImg);
-    testTile = tileset1.makeTileSprite(10,9,0,200, 5);
+    testTile = tileset1.makeTileSprite(10,9,0,200,5);
 
     window.tileset1 = tileset1;
     window.testTile = testTile;

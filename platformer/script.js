@@ -75,7 +75,7 @@ function makeCoin(tSprite){
     tSprite.notSolid = true;
     tSprite.onCollide = function(){
         coins ++;
-        console.log(engine.psuedoSprites.map(ps => ps.id));
+        // console.log(engine.psuedoSprites.map(ps => ps.id));
         engine.psuedoSprites = engine.psuedoSprites.filter(ps => ps.id != tSprite.id);
     }
 }

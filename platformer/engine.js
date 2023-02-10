@@ -11,6 +11,7 @@ function rectangleIntersects(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2){
 const VELOCITY_SMOOTHING = 0.2;
 const GRAVITY_MULTIPLIER = 0.2;
 const JUMP_MULTIPLIER = 5;
+const JUMP_COOLDOWN = 500;
 
 class Tileset {
     constructor(image, tileWidth, tileHeight){
@@ -22,6 +23,7 @@ class Tileset {
     debugTilemap(){
         image(this.image,100,100);
         text("X: " + (mouseX - 100) + " Y: " + (mouseY - 100), 100, 100);
+        text("TX: " + Math.floor((mouseX - 100) / this.tileWidth) + " TY: " + Math.floor((mouseY - 100) / this.tileHeight), 100, 120);
     }
 
     makeTileSprite(tilex, tiley, offsetX, offsetY, scale = 1, targetSize = null){
@@ -40,13 +42,18 @@ class Tileset {
         return ps;
     }
 
-    drawTile(offsetX, offsetY, tx, ty, scale){
+    drawTile(offsetX, offsetY, tx, ty, scale, tint = 0){
         // prevent smoothing from messing up the tileset pixel art
         noSmooth();
         image(this.image, offsetX, offsetY,
              this.tileWidth * scale, this.tileHeight * scale,
              tx * this.tileWidth, ty * this.tileHeight,
               this.tileWidth, this.tileHeight);
+        if(tint){
+            fill(0,100,0,tint);
+            stroke("white");
+            rect(offsetX, offsetY, offsetX + this.tileWidth * scale, offsetY + this.tileHeight * scale);
+        }
         smooth();
     }
 }
@@ -62,6 +69,14 @@ class PsuedoSprite {
     // Selected tile x,y
     tx = 0;
     ty = 0;
+
+    /**
+     * Double jump enabled.
+     * @type {boolean}
+     * @memberof PsuedoSprite
+     */
+    doubleJumpEnabled = false;
+    doubleJumpCounter = 0;
 
     constructor(x,y){
         this.x = x;
@@ -193,6 +208,10 @@ class Engine {
         return sprite;
     }
 
+    removePsuedoSprite(sprite){
+        this.psuedoSprites.splice(this.psuedoSprites.indexOf(sprite), 1);
+    }
+
     get(id){
         // get from map
         // TODO: mb prototype pollution fix
@@ -317,7 +336,13 @@ class Engine {
     generateDebug(){
         this.debug["psCount"] = this.psuedoSprites.length;
         this.debug["player_bb"] = this.getPlayerBoundingBox();
-        this.debug["ps_bb"] = this.psuedoSprites[0].getBoundingBox();
+        if(this.psuedoSprites[0]){
+            this.debug["ps_bb"] = this.psuedoSprites[0].getBoundingBox();
+        }else{
+            if(this.debug["ps_bb"]){
+                delete this.debug["ps_bb"];
+            }
+        }
     }
 
     runDebugControls(){
@@ -334,12 +359,8 @@ class Engine {
                 text(key + ": " + this.debug[key], 10, curDebugY);
                 curDebugY += 20;
             }
-            // Draw bounding boxes
+            // Draw bounding boxes if r is pressed
             let bb = this.getPlayerBoundingBox();
-
-            rectMode(CORNERS);
-            fill("red");
-            console.log(...bb[0], ...bb[1]);
             /*let dbg = document.getElementById("debug-rect");
             dbg.style.backgroundColor = "cyan";
             dbg.style.left = bb[0][0] + "px";
@@ -348,11 +369,16 @@ class Engine {
             dbg.style.width = (bb[1][0] - bb[0][0]) + "px";
             dbg.style.minHeight = (bb[1][1] - bb[0][1]) + "px";
             dbg.style.height = (bb[1][1] - bb[0][1]) + "px";*/
-            if(kb.pressing("r")) rect(...bb[0], ...bb[1]);
+            if(kb.pressing("r")){
+                rectMode(CORNERS);
+                fill("red");
+                console.log(...bb[0], ...bb[1]);
+                rect(...bb[0], ...bb[1]);
 
-            bb = this.psuedoSprites[0].getBoundingBox();
-            fill("pink");
-            rect(...bb[0], ...bb[1]);
+                bb = this.psuedoSprites[0].getBoundingBox();
+                fill("pink");
+                rect(...bb[0], ...bb[1]);
+            }
         }else {
             this.ghostPlayer.visible = false;
             this.ghostPlayer.debug = false;
@@ -362,11 +388,13 @@ class Engine {
         }
     }
 
+    lastJump = 0;
+
     runKeyboardControls(){
         let movementAmount = this.movementPerMs * deltaTime;
         let movementVector = [0,0];
         // If you can't move downwards then you are on the ground
-        const onGround = !this.checkCanMoveInVector([0, this.player.height/10]);
+        const onGround = !this.checkCanMoveInVector([0, this.player.height/16]);
         if(kb.pressing("left")){
             movementVector[0] -= movementAmount * this.horziontalMovementMult;
         }
@@ -374,16 +402,26 @@ class Engine {
             movementVector[0] += movementAmount * this.horziontalMovementMult;
         }
         this.debug["onGround"] = onGround;
-        if(kb.pressing("up") || kb.pressing("space") || mouse.pressing()){
+        const triggerDoubleJump = (kb.pressed("up") || kb.pressed("space")) && performance.now() - this.lastJump < JUMP_COOLDOWN;
+        if(kb.pressing("up") || kb.pressing("space") || triggerDoubleJump){
             // This does the jump logic
-            
-            // Require the player to be on the ground, so we check collision going bottomn
+            this.lastJump = performance.now();
+            // Require the player to be on the ground, so we check collision going bottom
             if(onGround){
                 this.velocity.y -= movementAmount * this.verticalMovementMult * JUMP_MULTIPLIER;
+            }else if(this.doubleJumpCounter > 0 && triggerDoubleJump){
+                // else try to do a double jump but not if the player is holding the jump button
+                this.velocity.y -= movementAmount * this.verticalMovementMult * JUMP_MULTIPLIER;
+                this.doubleJumpCounter--;
             }
         }
         if(!onGround){
-            this.velocity.y += deltaTime * GRAVITY_MULTIPLIER;
+            movementVector[1] += deltaTime * GRAVITY_MULTIPLIER;
+        }else{
+            // Reset double jump counter if enabled
+            if(this.doubleJumpEnabled){
+                this.doubleJumpCounter = 1;
+            }
         }
         if(kb.pressing("down")){
             movementVector[1] += movementAmount * this.verticalMovementMult;
@@ -416,6 +454,21 @@ class Engine {
         this.velocity.y *= (1 - VELOCITY_SMOOTHING);
     }
 
+    getWorldCoords(x,y){
+        // Undo our transform, to go from screen coords to where our "world" it is. so not relative to the player. 
+        return [x + this.offset.x - this.width / 2, y + this.offset.y - this.height/2];
+    }
+
+    beginWorldTranslation(){
+        translate(this.width/2,this.height/2);
+        translate(-this.offset.x, -this.offset.y);
+    }
+
+    endWorldTranslation(){
+        translate(this.offset.x, this.offset.y);
+        translate(-this.width/2,-this.height/2);
+    }
+
     loop(deltaTime_ms){
         this.delta = deltaTime_ms;
         this.clear();
@@ -424,13 +477,11 @@ class Engine {
         this.runControls();
         this.update();
         // Draw the psuedo sprites
-        translate(this.width/2,this.height/2);
-        translate(-this.offset.x, -this.offset.y);
+        this.beginWorldTranslation();
         for(let ps of this.psuedoSprites){
             ps.draw();
         }
-        translate(this.offset.x, this.offset.y);
-        translate(-this.width/2,-this.height/2);
+        this.endWorldTranslation();
         // Draw the real sprites
         for(let sprite of this.sprites){
             sprite.draw();

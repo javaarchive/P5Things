@@ -14,14 +14,23 @@ const JUMP_MULTIPLIER = 5;
 const JUMP_COOLDOWN = 500;
 
 class Tileset {
+
+    // We assign unique IDs to each tilset for debugging purposes.
+    static tilesetIDCounter = 0;
+    tsID = 0;
+
     constructor(image, tileWidth, tileHeight){
         this.image = image;
         this.tileWidth = tileWidth;
         this.tileHeight = tileHeight;
+        Tileset.tilesetCounter += 1;
+        this.tsID = Tileset.tilesetCounter;
+        
     }
 
     debugTilemap(){
         image(this.image,100,100);
+        textSize(16);
         text("X: " + (mouseX - 100) + " Y: " + (mouseY - 100), 100, 100);
         text("TX: " + Math.floor((mouseX - 100) / this.tileWidth) + " TY: " + Math.floor((mouseY - 100) / this.tileHeight), 100, 120);
     }
@@ -69,14 +78,7 @@ class PsuedoSprite {
     // Selected tile x,y
     tx = 0;
     ty = 0;
-
-    /**
-     * Double jump enabled.
-     * @type {boolean}
-     * @memberof PsuedoSprite
-     */
-    doubleJumpEnabled = false;
-    doubleJumpCounter = 0;
+    id = -1;
 
     constructor(x,y){
         this.x = x;
@@ -84,6 +86,7 @@ class PsuedoSprite {
         this.width = 0;
         this.height = 0;
         this.image = null;
+        this.id = Math.random().toString(); // so I made nanoid on a budget!
     }
 
     setSquare(wh){
@@ -107,6 +110,21 @@ class PsuedoSprite {
             [this.x, this.y],
             [this.x + this.width, this.y + this.height]
         ];
+    }
+
+    serialize(){
+        return {
+            x: this.x,
+            y: this.y,
+            width: this.width,
+            height: this.height,
+            // we don't serialize the image because it's part of the tileset, and we only support serilaizing tilesets rn
+            tid: this.tileset.tsID,
+            tx: this.tx,
+            ty: this.ty,
+            tileUpscale: this.tileUpscale,
+            notSolid: this.notSolid ? true: false
+        };
     }
 }
 
@@ -172,6 +190,9 @@ class Engine {
 
     horziontalMovementMult = 0.3;
     verticalMovementMult = 1;
+
+    doubleJumpCounter = 1;
+    doubleJumpEnabled = false;
 
     loadAssetImage(src, id = null){
         // Load assets
@@ -312,8 +333,16 @@ class Engine {
         let point1 = bb[0];
         let point2 = bb[1];
         this.debug["intersectsPS"] = false;
-        for(let psuedoSprites of this.psuedoSprites){
-            let psbb = psuedoSprites.getBoundingBox();
+        for(let psuedoSprite of this.psuedoSprites){
+            let psbb = psuedoSprite.getBoundingBox();
+            if(psuedoSprite.notSolid){ // a bit lazy so I'm doing an inverse boolean
+                if(psuedoSprite.onCollide){
+                    if(rectangleIntersects(...bb[0], ...bb[1], ...psbb[0], ...psbb[1])){
+                        psuedoSprite.onCollide();
+                    }
+                }
+                continue;
+            }
             // Get the two bounding boxes and check for intersect
             if(rectangleIntersects(...bb[0], ...bb[1], ...psbb[0], ...psbb[1])){
                 this.debug["intersectsPS"] = true;
@@ -349,6 +378,8 @@ class Engine {
         this.generateDebug();
         if(kb.pressing("q")){
             fill("red");
+            stroke("red");
+            textSize(16);
             text("FPS: " + Math.round(frameRate()), 10,10);
             text("Offset: " + Math.floor(this.offset.x) + ", " + Math.floor(this.offset.y), 10, 30);
             this.ghostPlayer.visible = true;
@@ -478,9 +509,11 @@ class Engine {
         this.update();
         // Draw the psuedo sprites
         this.beginWorldTranslation();
+        if(this.psuedoSpritedrawHook) this.psuedoSpritedrawHook(-1);
         for(let ps of this.psuedoSprites){
             ps.draw();
         }
+        if(this.psuedoSpritedrawHook) this.psuedoSpritedrawHook(1);
         this.endWorldTranslation();
         // Draw the real sprites
         for(let sprite of this.sprites){

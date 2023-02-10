@@ -19,19 +19,19 @@ let backgrounds = [];
 const TILE_MULTIPLIER = 5;
 
 function preload(){
-    characterImg = engine.loadAssetImage("platformer/assets/MiniKingManSingleMedium.png");
+    characterImg = engine.loadAssetImage("/platformer/assets/MiniKingManSingleMedium.png");
     backgrounds = [
-        engine.loadAssetImage("platformer/assets/Puffy_Sky-Sunset_01-1024x512.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/2.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/3.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/4.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/5.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/6.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/mountain.png"),
-        engine.loadAssetImage("platformer/assets/skypack_1/Puffy_Sky-Blue_01-1024x512.png")
+        engine.loadAssetImage("/platformer/assets/Puffy_Sky-Sunset_01-1024x512.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/2.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/3.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/4.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/5.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/6.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/mountain.png"),
+        engine.loadAssetImage("/platformer/assets/skypack_1/Puffy_Sky-Blue_01-1024x512.png")
     ];
     engine.bg = backgrounds[0];
-    tileset1 = new Tileset(engine.loadAssetImage("platformer/assets/tilemapedit.png"), 16, 16);
+    tileset1 = new Tileset(engine.loadAssetImage("/platformer/assets/tilemapedit.png"), 16, 16);
 }
 
 function setup(){

@@ -1,7 +1,7 @@
 import {Engine, Tileset} from "./engine.js";
 
-const WIDTH = 1280*2;
-const HEIGHT = 720*2;
+const WIDTH = window.innerWidth;
+const HEIGHT = window.innerHeight;
 
 /** @type {Engine} */
 let engine = new Engine(WIDTH, HEIGHT);

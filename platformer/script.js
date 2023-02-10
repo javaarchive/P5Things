@@ -19,7 +19,7 @@ let backgrounds = [];
 const TILE_MULTIPLIER = 5;
 
 function preload(){
-    characterImg = engine.loadAssetImage("platformer/assets/MiniKingManSingleLarge.png");
+    characterImg = engine.loadAssetImage("platformer/assets/MiniKingManSingleMedium.png");
     backgrounds = [
         engine.loadAssetImage("platformer/assets/Puffy_Sky-Sunset_01-1024x512.png"),
         engine.loadAssetImage("platformer/assets/skypack_1/2.png"),

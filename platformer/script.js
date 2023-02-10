@@ -18,7 +18,7 @@ const TILE_MULTIPLIER = 5;
 
 function preload(){
     characterImg = engine.loadAssetImage("platformer/assets/default.png");
-    engine.bg = engine.loadAssetImage("platformer/assets/cloudmap_bg.png");
+    engine.bg = engine.loadAssetImage("platformer/assets/Puffy_Sky-Sunset_01-1024x512.png");
     tileset1 = new Tileset(engine.loadAssetImage("platformer/assets/stringstar_fields/tileset.png"), 16, 16);
 }
 

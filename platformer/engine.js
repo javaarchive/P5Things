@@ -1,4 +1,4 @@
-// How much extra backgroudn tiles to draw (may go offscreen)
+// How much extra backgroudn tiles to draw (may go offscreen but better too much than too less)
 const OVERDRAW_BG = 4;
 
 function rectangleIntersects(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2){
@@ -8,10 +8,11 @@ function rectangleIntersects(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2){
 // Sprite but minimal for tiles. 
 // Supports only rectangle bounding box. 
 
+// These do what you think they do
 const VELOCITY_SMOOTHING = 0.2;
 const GRAVITY_MULTIPLIER = 0.2;
-const JUMP_MULTIPLIER = 5;
-const JUMP_COOLDOWN = 500;
+const JUMP_MULTIPLIER = 5; 
+const JUMP_COOLDOWN = 500; // ms
 
 class Tileset {
 
@@ -19,15 +20,16 @@ class Tileset {
     static tilesetIDCounter = 0;
     tsID = 0;
 
+
     constructor(image, tileWidth, tileHeight){
         this.image = image;
         this.tileWidth = tileWidth;
         this.tileHeight = tileHeight;
         Tileset.tilesetCounter += 1;
         this.tsID = Tileset.tilesetCounter;
-        
     }
 
+    // Debugging function to show tile coordinates and draws the tilemap. 
     debugTilemap(){
         image(this.image,100,100);
         textSize(16);
@@ -35,6 +37,7 @@ class Tileset {
         text("TX: " + Math.floor((mouseX - 100) / this.tileWidth) + " TY: " + Math.floor((mouseY - 100) / this.tileHeight), 100, 120);
     }
 
+    // Create a psuedo sprite from a tile
     makeTileSprite(tilex, tiley, offsetX, offsetY, scale = 1, targetSize = null){
         let ps = new PsuedoSprite(offsetX, offsetY);
         ps.image = this.image;
@@ -51,6 +54,7 @@ class Tileset {
         return ps;
     }
 
+    // Draw a tile from the tileset
     drawTile(offsetX, offsetY, tx, ty, scale, tint = 0){
         // prevent smoothing from messing up the tileset pixel art
         noSmooth();
@@ -74,10 +78,12 @@ class PsuedoSprite {
      * @memberof PsuedoSprite
      */
     tileset = null;
+    // Whether to upscale the tile (will be done without smoothing or ditherings)
     tileUpscale = 1;
     // Selected tile x,y
     tx = 0;
     ty = 0;
+    // See constructor
     id = -1;
 
     constructor(x,y){
@@ -86,6 +92,8 @@ class PsuedoSprite {
         this.width = 0;
         this.height = 0;
         this.image = null;
+        // Each sprite gets a unique identifier to identify it apart from the others
+        // It is used to idetnify psuedo sprites to delete
         this.id = Math.random().toString(); // so I made nanoid on a budget!
     }
 
@@ -94,6 +102,7 @@ class PsuedoSprite {
         this.height = wh;
     }
     
+    // draw the sprite. Currently I only use the tile version. 
     draw(){
         if(this.image){
             if(this.tileset){
@@ -105,6 +114,7 @@ class PsuedoSprite {
         }
     }
 
+    // bounding box as two points
     getBoundingBox(){
         return [
             [this.x, this.y],
@@ -132,8 +142,10 @@ class Engine {
 
     movementPerMs = 2;
 
+    // screen width,height to be updated before init. 
     width = 640;
     height = 480;
+    // target fps
     fps = 60;
 
     /**
@@ -151,6 +163,7 @@ class Engine {
         this.world = window.world;
     }*/
 
+    // this does what you think it is 
     syncSettings(){
         frameRate(this.fps);
     }
@@ -167,8 +180,8 @@ class Engine {
     assets = [];
     fonts = [];
     engine_data = {};
-    bg = null;
-    tile = true;
+    bg = null; // background to render if needed
+    tile = true; // do we tile the background so it isn't stretched?
     offset = {
         x: 0,
         y: 0
@@ -180,20 +193,27 @@ class Engine {
      */
     psuedoSprites = [];
     debug = {};
+    // Velcoity X and Y
     velocity = {
         x: 0,
         y: 0
     }
 
+
+    // Controlled players. 
     player = null;
     ghostPlayer = null; 
 
+    // Movement multipliers. 
     horziontalMovementMult = 0.3;
     verticalMovementMult = 1;
 
+    // We keep the double jump state here
     doubleJumpCounter = 1;
+    // "Explicit over Implicit" - Zen of Python
     doubleJumpEnabled = false;
 
+    // Asset loader alias that keeps track of stuff it loads
     loadAssetImage(src, id = null){
         // Load assets
         let img = loadImage(src);
@@ -201,11 +221,13 @@ class Engine {
         return img;
     }
 
+    // TODO: Use this maybe later. 
     loadFont(src){
         // Load font
         this.fonts.push(loadFont(src));
     }
 
+    // I forgot what I wanted to do here
     loadData(src, id){
         engine_data[loadJSON(src)];
     }
@@ -259,6 +281,7 @@ class Engine {
         this.player = player;
     }
 
+    // See collision functiomn for what the ghostplayer is for
     createGhostPlayer(playerImage){
         this.ghostPlayer = new Sprite(this.width/2, this.height/2);
         this.ghostPlayer.image = playerImage;
@@ -299,7 +322,7 @@ class Engine {
     delta = 0;
 
     constructor(width, height){
-        console.log("Engine: Create");
+        console.log("Engine: Create"); // so I know the engine started in console. 
         this.width = width;
         this.height = height;
         this.sprites = [];
@@ -323,6 +346,7 @@ class Engine {
      */
     checkCanMoveInVector(vec){
         if(!this.ghostPlayer) return true;
+        // We have an unseen "ghost sprite" that moves to the future position and check for collisions with it. 
         this.ghostPlayer.x = this.player.x + vec[0];
         this.ghostPlayer.y = this.player.y + vec[1];
         let bb = this.getPlayerBoundingBox();
@@ -333,6 +357,7 @@ class Engine {
         let point1 = bb[0];
         let point2 = bb[1];
         this.debug["intersectsPS"] = false;
+        // Loop through every psuedosprite and check for collision of their bounding boxes
         for(let psuedoSprite of this.psuedoSprites){
             let psbb = psuedoSprite.getBoundingBox();
             if(psuedoSprite.notSolid){ // a bit lazy so I'm doing an inverse boolean
@@ -349,6 +374,7 @@ class Engine {
                 return false;
             }
         }
+        // Loop through every p5 sprite and check for collision. 
         this.debug["intersectsSpr"] = false;
         for(let objSprite of this.sprites){
             if(objSprite.solid){
@@ -386,6 +412,7 @@ class Engine {
             this.ghostPlayer.debug = true;
             let curDebugY = 50;
             let keys = Object.keys(this.debug);
+            // Render debug text spaced apart apporiately. 
             for(let key of keys){
                 text(key + ": " + this.debug[key], 10, curDebugY);
                 curDebugY += 20;
@@ -419,13 +446,17 @@ class Engine {
         }
     }
 
+    // Last in ms time. 
     lastJump = 0;
 
     runKeyboardControls(){
+        // We use the time between frames so slower computers don't get a disadvantage. 
         let movementAmount = this.movementPerMs * deltaTime;
+        // Calculate vector of movement based off keyboard controls and gravity
         let movementVector = [0,0];
         // If you can't move downwards then you are on the ground
         const onGround = !this.checkCanMoveInVector([0, this.player.height/16]);
+        // Horizontal movement. 
         if(kb.pressing("left")){
             movementVector[0] -= movementAmount * this.horziontalMovementMult;
         }
@@ -438,6 +469,7 @@ class Engine {
             // This does the jump logic
             this.lastJump = performance.now();
             // Require the player to be on the ground, so we check collision going bottom
+            // We use velocity Y to have a very smooth jump with acceleration. 
             if(onGround){
                 this.velocity.y -= movementAmount * this.verticalMovementMult * JUMP_MULTIPLIER;
             }else if(this.doubleJumpCounter > 0 && triggerDoubleJump){
@@ -447,6 +479,7 @@ class Engine {
             }
         }
         if(!onGround){
+            // Gravity is done through a constant move vector thing
             movementVector[1] += deltaTime * GRAVITY_MULTIPLIER;
         }else{
             // Reset double jump counter if enabled
@@ -471,6 +504,7 @@ class Engine {
     runControls(){
         this.runDebugControls();
         this.runKeyboardControls();
+        // TODO: Mouse controls. 
     }
 
     clear(){
@@ -479,6 +513,8 @@ class Engine {
 
     update(){
         // Apply velocity
+        // So how this works is we "approach" the intended velocity through the smoothing value
+        // Just pick up a math book and read what a limit is. 
         this.offset.x += this.velocity.x * VELOCITY_SMOOTHING;
         this.offset.y += this.velocity.y * VELOCITY_SMOOTHING;
         this.velocity.x *= (1 - VELOCITY_SMOOTHING);
@@ -490,6 +526,7 @@ class Engine {
         return [x + this.offset.x - this.width / 2, y + this.offset.y - this.height/2];
     }
 
+    // Translate world coords to actual on screen controls
     beginWorldTranslation(){
         translate(this.width/2,this.height/2);
         translate(-this.offset.x, -this.offset.y);
@@ -500,6 +537,7 @@ class Engine {
         translate(-this.width/2,-this.height/2);
     }
 
+    // To be called by actual loop. You want to pass the deltatime. 
     loop(deltaTime_ms){
         this.delta = deltaTime_ms;
         this.clear();
@@ -525,6 +563,7 @@ class Engine {
         }
     }
 
+    // Initalization stuff
     init(){
         rectMode(CORNERS);
     }

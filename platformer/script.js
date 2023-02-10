@@ -14,6 +14,7 @@ let testTile;
 let selectedTX = 0;
 let selectedTY = 0;
 
+// Loaded backgrounds
 let backgrounds = [];
 
 const TILE_MULTIPLIER = 5;
@@ -31,17 +32,22 @@ function preload(){
         engine.loadAssetImage("/platformer/assets/skypack_1/Puffy_Sky-Blue_01-1024x512.png")
     ];
     engine.bg = backgrounds[0];
+    // we use one tileset for everything
+    // I just use an image editor to merge tiles
     tileset1 = new Tileset(engine.loadAssetImage("/platformer/assets/tilemapedit.png"), 16, 16);
 }
 
 function setup(){
     new Canvas(WIDTH,HEIGHT);
     engine.createSimplePlayer(characterImg);
+    // This is a test tile
+    // It is not shown because it is never actually added to the engine. 
     testTile = tileset1.makeTileSprite(10,9,0,16*5*2,TILE_MULTIPLIER);
 
     window.tileset1 = tileset1;
     window.testTile = testTile;
 
+    // Double jump is disabled in the engine by default. 
     engine.doubleJumpEnabled = true;
 
     // engine.addPsuedoSprite(testTile);
@@ -80,6 +86,7 @@ function makeCoin(tSprite){
     }
 }
 
+// Change background based off coordinates
 function tickDynamicBg(){
     if(engine.offset.x < -100){
         engine.bg = backgrounds[0];
@@ -104,7 +111,7 @@ function draw(){
 
     let tileScreenSize = tileset1.tileWidth * TILE_MULTIPLIER;
 
-    // Editor
+    // Editor logic
     if(kb.pressing("shift")){
         textSize(16);
         fill("blue");
@@ -118,9 +125,11 @@ function draw(){
         engine.endWorldTranslation();
         if(mouse.pressed()){
             if(engine.psuedoSprites.filter(ps => ps.x == nearestTileX && ps.y == nearestTileY).length == 0){
-                console.log("Pusedo sprite added");
+                console.log("Psuedo sprite added");
                 let tSprite = tileset1.makeTileSprite(selectedTX, selectedTY,nearestTileX, nearestTileY, TILE_MULTIPLIER);
                 if(selectedTX == 0 && selectedTY == 11){
+                    // hardcoded coin tile detection
+                    // will make the thing passthrough and increase coin count on collision. 
                     console.log("Added coin");
                     makeCoin(tSprite);
                 }
@@ -136,6 +145,7 @@ function draw(){
             }
         }
     }
+    // This used to be how I would pick a tile
     if(kb.pressing("z")){
         nums.forEach((n) => {
             if(kb.pressing(n.toString())){
@@ -152,15 +162,17 @@ function draw(){
             }
         });
     }
+    // The new point and click to choose tile thing
     if(kb.pressing("control")){
         tileset1.debugTilemap();
         if(mouse.pressed()){
+            // I don't bound check because I assume whoever is level editting knows what they're doing
             selectedTX = Math.floor((mouse.x - 100) / tileset1.tileWidth);
             selectedTY = Math.floor((mouse.y - 100) / tileset1.tileHeight);
         }
     }
     if(kb.pressed("o")){
-        // Copy level data to your clipboard. 
+        // Copy serialized level data to your clipboard. 
         console.log("Exporting level please wait...");
         let levelData = {
             psuedoSprites: engine.psuedoSprites.map((ps) => {
@@ -174,18 +186,18 @@ function draw(){
     textSize(32)
     fill("blue");
     stroke("blue");
-
     tickDynamicBg();
-    // The coins text covers my "level editor"
+    // The coins text covers my "level editor" so it's here
+    // Draw score
     if(!kb.pressing("shift") && !kb.pressing("t")) text(`Coins ${coins}`, 100, 100);
 }
 
-// Expose these to p5
+// The following lines are required due to the module system. 
 
+// Expose these to p5
 window.preload = preload;
 window.setup = setup;
 window.draw = draw;
 
 // Expose for console debug
-
 window.engine = engine;
